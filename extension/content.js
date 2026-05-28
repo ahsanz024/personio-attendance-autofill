@@ -34,8 +34,9 @@
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return null;
     const dayOfWeek = date.getDay();
-    const isWeekend = rowEl.getAttribute('data-is-weekend') === 'true' || dayOfWeek === 0 || dayOfWeek === 6;
-    return { dayNumber: date.getDate(), rowEl, date, isWeekend, dayOfWeek };
+    const isWeekend = rowEl.getAttribute('data-is-weekend') === 'true'; // Only trust DOM, never JS date
+
+    return { id: dateStr, dayNumber: date.getDate(), rowEl, date, isWeekend, dayOfWeek };
   }
 
   function getTrackedHours(rowEl) {
@@ -432,7 +433,7 @@
         let rowEl = null;
         for (const r of freshRows) {
           const p = parseDayRow(r);
-          if (p && p.dayNumber === dn) { rowEl = r; break; }
+          if (p && p.id === day.id) { rowEl = r; break; }
         }
         if (!rowEl) {
           logger.push('⏭️  ' + label + ': Zeile nicht mehr im DOM');
@@ -457,7 +458,7 @@
 
         logger.push('--- ' + label + ' ---');
         try {
-          const dayObj = { dayNumber: dn, rowEl: rowEl };
+          const dayObj = { id: day.id, dayNumber: dn, rowEl: rowEl };
           const ok = await fillSingleDay(dayObj, times, logger);
           if (ok) { filled++; logger.push('✅ ' + label + ' filled'); }
           else { logger.push('⚠️  ' + label + ' not filled'); }
