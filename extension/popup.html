@@ -1,26 +1,45 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      width: 320px;
+      width: 340px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: #1a1d23;
       color: #e0e0e0;
       padding: 16px;
     }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
     h1 {
       font-size: 16px;
       font-weight: 600;
       color: #00AB5F;
-      margin-bottom: 12px;
       display: flex;
       align-items: center;
       gap: 8px;
     }
     h1 svg { width: 20px; height: 20px; }
+    .icon-btn {
+      background: none;
+      border: none;
+      color: #8b8fa3;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .icon-btn:hover { background: #2a2e36; color: #e0e0e0; }
+    .icon-btn svg { width: 18px; height: 18px; }
+
     .schedule {
       background: #22262e;
       border-radius: 8px;
@@ -33,6 +52,28 @@
     }
     .schedule dt { color: #8b8fa3; }
     .schedule dd { color: #e0e0e0; font-weight: 500; }
+    .badge {
+      display: inline-block;
+      background: #2a2e36;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #8b8fa3;
+      margin-left: 4px;
+    }
+
+    #summary {
+      display: none;
+      background: #22262e;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      font-size: 13px;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 4px;
+      text-align: center;
+    }
+
     button {
       width: 100%;
       padding: 10px;
@@ -59,6 +100,7 @@
     }
     #clearBtn:hover { background: #2a2e36; color: #e0e0e0; }
     #clearBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
     #status {
       background: #22262e;
       border-radius: 6px;
@@ -68,62 +110,170 @@
       max-height: 200px;
       overflow-y: auto;
       color: #8b8fa3;
-      white-space: pre-wrap;
     }
     .status-ok { color: #00AB5F; }
     .status-error { color: #e74c3c; }
     .status-info { color: #5b9bd5; }
+
     .footer {
       margin-top: 10px;
       font-size: 11px;
       color: #5a5e6b;
       text-align: center;
     }
-    .badge {
-      display: inline-block;
-      background: #2a2e36;
-      padding: 1px 6px;
-      border-radius: 4px;
-      font-size: 11px;
+
+    /* Settings view */
+    #settingsView {
+      display: none;
+    }
+    #settingsView h2 {
+      font-size: 14px;
+      color: #e0e0e0;
+      margin-bottom: 12px;
+    }
+    .setting-group {
+      margin-bottom: 14px;
+    }
+    .setting-group label {
+      display: block;
+      font-size: 12px;
       color: #8b8fa3;
-      margin-left: 4px;
+      margin-bottom: 4px;
+    }
+    .setting-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .setting-row input {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid #3a3f4a;
+      background: #2a2e36;
+      color: #e0e0e0;
+      font-size: 14px;
+      font-weight: 500;
+      font-family: inherit;
+    }
+    .setting-row input:focus {
+      outline: none;
+      border-color: #00AB5F;
+    }
+    select {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid #3a3f4a;
+      background: #2a2e36;
+      color: #e0e0e0;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    select:focus {
+      outline: none;
+      border-color: #00AB5F;
+    }
+    #saveSettingsBtn {
+      background: #00AB5F;
+      color: #fff;
+      margin-top: 8px;
+    }
+    #saveSettingsBtn:hover { background: #00954f; }
+    #saveSettingsBtn:disabled { background: #3a3f4a; color: #6b6f7a; cursor: not-allowed; }
+    #saveFeedback {
+      font-size: 12px;
+      margin-top: 6px;
+      text-align: center;
     }
   </style>
 </head>
 <body>
-  <h1>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <circle cx="12" cy="12" r="10"/>
-      <polyline points="12 6 12 12 16 14"/>
-    </svg>
-    Personio Autofill
-  </h1>
 
-  <dl class="schedule">
-    <dt>Arbeit 1</dt>
-    <dd>09:00 – 12:00</dd>
-    <dt>Pause</dt>
-    <dd>12:00 – 13:00</dd>
-    <dt>Arbeit 2</dt>
-    <dd>13:00 – 18:00</dd>
-    <dt>Modus</dt>
-    <dd>Nur leere Werktage <span class="badge">Mo–Fr</span></dd>
-  </dl>
+  <!-- ===== MAIN VIEW ===== -->
+  <div id="mainView">
+    <div class="header">
+      <h1>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        <span id="mainTitle">Personio Autofill</span>
+      </h1>
+      <button class="icon-btn" id="settingsBtn" title="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
 
-  <div id="summary" style="display:none; background:#22262e; border-radius:6px; padding:8px 12px; margin-bottom:10px; font-size:13px; grid-template-columns:1fr 1fr 1fr; gap:4px; text-align:center;">
-    <div><div style="color:#00AB5F; font-size:18px; font-weight:700;" id="sumFilled">0</div><div style="color:#8b8fa3; font-size:11px;">Gefüllt</div></div>
-    <div><div style="color:#e0e0e0; font-size:18px; font-weight:700;" id="sumSkipped">0</div><div style="color:#8b8fa3; font-size:11px;">Übersprungen</div></div>
-    <div><div style="color:#e0e0e0; font-size:18px; font-weight:700;" id="sumTotal">0</div><div style="color:#8b8fa3; font-size:11px;">Gesamt</div></div>
+    <dl class="schedule" id="scheduleDisplay">
+      <dt data-i18n="work1">Work 1</dt>
+      <dd id="schedWork1">09:00 &ndash; 12:00</dd>
+      <dt data-i18n="break">Break</dt>
+      <dd id="schedBreak">12:00 &ndash; 13:00</dd>
+      <dt data-i18n="work2">Work 2</dt>
+      <dd id="schedWork2">13:00 &ndash; 18:00</dd>
+      <dt data-i18n="mode">Mode</dt>
+      <dd><span data-i18n="emptyWorkdays">Empty workdays only</span> <span class="badge">Mo&ndash;Fr</span></dd>
+    </dl>
+
+    <div id="summary">
+      <div><div style="color:#00AB5F;font-size:18px;font-weight:700" id="sumFilled">0</div><div style="color:#8b8fa3;font-size:11px" data-i18n="filled">Filled</div></div>
+      <div><div style="color:#e0e0e0;font-size:18px;font-weight:700" id="sumSkipped">0</div><div style="color:#8b8fa3;font-size:11px" data-i18n="skipped">Skipped</div></div>
+      <div><div style="color:#e0e0e0;font-size:18px;font-weight:700" id="sumTotal">0</div><div style="color:#8b8fa3;font-size:11px" data-i18n="total">Total</div></div>
+    </div>
+
+    <button id="fillBtn">
+      <span id="btnLabel" data-i18n="fillBtn">Fill all empty days</span>
+      <span id="spinner" style="display:none">&#x23F3;</span>
+    </button>
+    <button id="clearBtn" data-i18n="reloadBtn">Reload page</button>
+
+    <div id="status" data-i18n="statusDefault">Click "Fill all empty days" to start.</div>
+    <div class="footer" data-i18n="footer">Runs on Personio monthly view only</div>
   </div>
 
-  <button id="fillBtn">
-    <span id="btnLabel">📋 Alle leeren Tage füllen</span>
-    <span id="spinner" style="display:none">⏳</span>
-  </button>
-  <button id="clearBtn">🔄 Seite neu laden</button>
+  <!-- ===== SETTINGS VIEW ===== -->
+  <div id="settingsView">
+    <div class="header">
+      <button class="icon-btn" id="backBtn" title="Back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5m7-7-7 7 7 7"/>
+        </svg>
+      </button>
+      <h1><span data-i18n="settings">Settings</span></h1>
+      <div style="width:26px"></div>
+    </div>
 
-  <div id="status">Klicke auf "Alle leeren Tage füllen" um zu starten.</div>
-  <div class="footer">Läuft nur auf Personio Monatsansicht</div>
+    <div class="setting-group">
+      <label data-i18n="labelWorkHours">Work hours</label>
+      <div class="setting-row">
+        <input type="time" id="workStart" value="09:00">
+        <input type="time" id="workEnd" value="18:00">
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <label data-i18n="labelBreak">Break (lunch)</label>
+      <div class="setting-row">
+        <input type="time" id="breakStart" value="12:00">
+        <input type="time" id="breakEnd" value="13:00">
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <label data-i18n="labelLanguage">Language</label>
+      <select id="language">
+        <option value="en">English</option>
+        <option value="de">Deutsch</option>
+      </select>
+    </div>
+
+    <button id="saveSettingsBtn" data-i18n="saveBtn">Save</button>
+    <div id="saveFeedback"></div>
+  </div>
 
   <script src="popup.js"></script>
 </body>

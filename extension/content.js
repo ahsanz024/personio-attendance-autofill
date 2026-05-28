@@ -257,35 +257,41 @@
     return rows;
   }
 
-  // --- Fill a single day ---
-  async function fillSingleDay(day, logger) {
-    const rowEl = day.rowEl;
+  function parseTime(str) {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(str));
+    if (!m) return null;
+    return { h: parseInt(m[1]), m: parseInt(m[2]) };
+  }
 
-    // Dismiss any persistent modal first
+  // --- Fill a single day ---
+  async function fillSingleDay(day, times, logger) {
+    const rowEl = day.rowEl;
+    const { ws, bs, be, we } = times;
+
     dismissReviewModal();
 
     const form = await openDayEditor(rowEl, logger);
-    if (!form) { logger?.push(`  ❌ Editor nicht gefunden`); return false; }
+    if (!form) { logger?.push(`  ❌ Editor not found`); return false; }
     await sleep(200);
 
-    // --- Period 0: Arbeit 09:00-12:00 ---
+    // --- Period 0: Work ws → bs ---
     const p0s = form.querySelector('[data-test-id="periods.0.start"]');
     const p0e = form.querySelector('[data-test-id="periods.0.end"]');
     if (p0s && p0e) {
-      await fillTimeGroup(p0s, 9, 0, 'Arbeit 09:00', logger);
-      await fillTimeGroup(p0e, 12, 0, 'Arbeit 12:00', logger);
+      await fillTimeGroup(p0s, ws.h, ws.m, 'Work start', logger);
+      await fillTimeGroup(p0e, bs.h, bs.m, 'Work end', logger);
     }
     await sleep(80);
 
-    // --- Period 1: Pause 12:00-13:00 ---
+    // --- Period 1: Break bs → be ---
     let p1s = form.querySelector('[data-test-id="periods.1.start"]');
     let p1e = form.querySelector('[data-test-id="periods.1.end"]');
 
     if (p1s && p1e) {
-      await fillTimeGroup(p1s, 12, 0, 'Pause 12:00', logger);
-      await fillTimeGroup(p1e, 13, 0, 'Pause 13:00', logger);
+      await fillTimeGroup(p1s, bs.h, bs.m, 'Break start', logger);
+      await fillTimeGroup(p1e, be.h, be.m, 'Break end', logger);
     } else {
-      logger?.push(`  Kein Pause-Block, füge hinzu...`);
+      logger?.push(`  No break block, adding...`);
       const addBreak = form.querySelector('[data-test-id="timecard-add-break"]');
       if (addBreak) {
         click(addBreak);
@@ -293,49 +299,46 @@
         p1s = form.querySelector('[data-test-id="periods.1.start"]');
         p1e = form.querySelector('[data-test-id="periods.1.end"]');
         if (p1s && p1e) {
-          await fillTimeGroup(p1s, 12, 0, 'Pause 12:00', logger);
-          await fillTimeGroup(p1e, 13, 0, 'Pause 13:00', logger);
+          await fillTimeGroup(p1s, bs.h, bs.m, 'Break start', logger);
+          await fillTimeGroup(p1e, be.h, be.m, 'Break end', logger);
         }
       }
     }
     await sleep(80);
 
-    // Set Pause type on period 1 if needed
+    // Set Pause type on period 1
     const entryRows = form.querySelectorAll('[data-test-id="timeEntryRow"]');
     if (entryRows.length >= 2) {
       await ensurePeriodType(entryRows[1], 'Pause', logger);
     }
 
-    // --- Add Period 2: Arbeit 13:00-18:00 ---
+    // --- Add Period 2: Work be → we ---
     await ensureThirdWorkRow(form, logger);
     await sleep(300);
 
     const p2s = form.querySelector('[data-test-id="periods.2.start"]');
     const p2e = form.querySelector('[data-test-id="periods.2.end"]');
     if (p2s && p2e) {
-      await fillTimeGroup(p2s, 13, 0, 'Arbeit 13:00', logger);
-      await fillTimeGroup(p2e, 18, 0, 'Arbeit 18:00', logger);
+      await fillTimeGroup(p2s, be.h, be.m, 'Work start', logger);
+      await fillTimeGroup(p2e, we.h, we.m, 'Work end', logger);
     }
 
-    // Set Work type on period 2 if needed
     const rowsAfter = form.querySelectorAll('[data-test-id="timeEntryRow"]');
     if (rowsAfter.length >= 3) {
       await ensurePeriodType(rowsAfter[2], 'Arbeit', logger);
     }
 
-    // --- Save ---
+    // Save
     await sleep(200);
     const saveBtn = form.querySelector('[data-test-id="timecard-save-button"]');
-    if (!saveBtn) { logger?.push(`  ⚠️ Kein Speichern-Button`); return false; }
+    if (!saveBtn) { logger?.push(`  ⚠️ No save button`); return false; }
 
     click(saveBtn);
-    logger?.push(`  💾 Gespeichert`);
+    logger?.push(`  💾 Saved`);
     await sleep(800);
 
-    // Check for validation modal
     if (dismissReviewModal()) {
-      logger?.push(`  ⚠️ Validierungsmodal erschienen — Tag möglicherweise nicht gespeichert`);
-      // Close the editor
+      logger?.push(`  ⚠️ Validation modal appeared — day may not be saved`);
       const cancel = form.querySelector('[data-test-id="timecard-cancel-button"]');
       if (cancel) { click(cancel); await sleep(300); }
       return false;
@@ -347,13 +350,20 @@
   // --- Main autofill ---
   let isRunning = false;
 
-  async function autofill() {
-    if (isRunning) return { ok: false, error: 'Läuft bereits' };
+  async function autofill(settings) {
+    if (isRunning) return { ok: false, error: 'Already running' };
     isRunning = true;
 
+    const times = {
+      ws: parseTime(settings?.workStart) || { h: 9, m: 0 },
+      bs: parseTime(settings?.breakStart) || { h: 12, m: 0 },
+      be: parseTime(settings?.breakEnd) || { h: 13, m: 0 },
+      we: parseTime(settings?.workEnd) || { h: 18, m: 0 }
+    };
+
     const logger = [];
-    logger.push('🔍 Personio Autofill gestartet...');
-    showFeedback('⏳ Fülle Tage...', 'success');
+    logger.push('🔍 Autofill started...');
+    showFeedback('⏳ Filling days...', 'success');
 
     try {
       const rowEls = document.querySelectorAll('[data-test-id="timesheet-timecard"][role="row"]');
@@ -402,14 +412,14 @@
         const isHoliday = rowEl.getAttribute('data-is-holiday') === 'true';
         const isOffDay = rowEl.getAttribute('data-is-off-day') === 'true';
         if (isHoliday || isOffDay) {
-          logger.push('⏭️  ' + label + ': Feiertag/Abwesenheit');
+          logger.push('⏭️  ' + label + ': holiday/absence');
           skippedFilled++;
           continue;
         }
 
         const tracked = getTrackedHours(rowEl);
         if (tracked && tracked.current > 0) {
-          logger.push('⏭️  ' + label + ': ' + tracked.current + 'h bereits erfasst');
+          logger.push('⏭️  ' + label + ': ' + tracked.current + 'h already tracked');
           skippedFilled++;
           continue;
         }
@@ -417,9 +427,9 @@
         logger.push('--- ' + label + ' ---');
         try {
           const dayObj = { dayNumber: dn, rowEl: rowEl };
-          const ok = await fillSingleDay(dayObj, logger);
-          if (ok) { filled++; logger.push('✅ ' + label + ' gefüllt'); }
-          else { logger.push('⚠️  ' + label + ' nicht gefüllt'); }
+          const ok = await fillSingleDay(dayObj, times, logger);
+          if (ok) { filled++; logger.push('✅ ' + label + ' filled'); }
+          else { logger.push('⚠️  ' + label + ' not filled'); }
         } catch (err) {
           logger.push('❌ ' + label + ': ' + err.message);
         }
@@ -428,16 +438,16 @@
 
       const total = days.length;
       const skipped = skippedWeekend + skippedFilled;
-      const summary = filled + ' von ' + total + ' Tagen gefüllt (' + skipped + ' übersprungen)';
+      const summary = filled + '/' + total + ' days filled (' + skipped + ' skipped)';
       logger.push('--- ' + summary + ' ---');
 
       if (filled > 0) showFeedback('✅ ' + summary, 'success');
-      else if (skipped === total) showFeedback('ℹ️ Alle Tage bereits erfasst oder Wochenende', 'success');
+      else if (skipped === total) showFeedback('ℹ️ All days already tracked or weekend', 'success');
       else showFeedback('⚠️ ' + summary, 'error');
 
       return { ok: true, summary, filled, total, skipped, logs: logger };
     } catch (err) {
-      showFeedback('❌ Fehler: ' + err.message, 'error');
+      showFeedback('❌ Error: ' + err.message, 'error');
       return { ok: false, error: err.message, logs: logger };
     } finally {
       isRunning = false;
@@ -446,7 +456,13 @@
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'AUTOFILL') {
-      autofill().then(r => sendResponse(r));
+      const settings = {
+        workStart: message.workStart,
+        workEnd: message.workEnd,
+        breakStart: message.breakStart,
+        breakEnd: message.breakEnd
+      };
+      autofill(settings).then(r => sendResponse(r));
       return true;
     }
   });
