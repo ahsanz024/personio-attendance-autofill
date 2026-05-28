@@ -62,6 +62,10 @@ extension/
 └── icons/          # Extension icons (SVG + 16/48/128 PNGs)
 ```
 
+## Disclaimer
+
+This extension is **not affiliated with, endorsed by, or sponsored by Personio SE & Co. KG**. It is an independent open-source tool that automates interactions with the Personio web interface. Personio® is a registered trademark of Personio SE & Co. KG.
+
 ## License
 
 [MIT](LICENSE)
