@@ -34,7 +34,8 @@
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return null;
     const dayOfWeek = date.getDay();
-    const isWeekend = rowEl.getAttribute('data-is-weekend') === 'true' || dayOfWeek === 0 || dayOfWeek === 6;
+    const isWeekend = rowEl.getAttribute('data-is-weekend') === 'true'; // Only trust DOM, never JS date
+
     return { id: dateStr, dayNumber: date.getDate(), rowEl, date, isWeekend, dayOfWeek };
   }
 
