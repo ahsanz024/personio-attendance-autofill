@@ -12,6 +12,7 @@ const strings = {
     total: 'Total',
     fillBtn: 'Fill all empty days',
     fillBtnBusy: 'Filling days...',
+    stopBtn: 'Stop',
     reloadBtn: 'Reload page',
     statusDefault: 'Click "Fill all empty days" to start.',
     footer: 'Runs on Personio monthly view only',
@@ -38,6 +39,7 @@ const strings = {
     total: 'Gesamt',
     fillBtn: 'Alle leeren Tage füllen',
     fillBtnBusy: 'Fülle Tage...',
+    stopBtn: 'Stop',
     reloadBtn: 'Seite neu laden',
     statusDefault: 'Klicke auf "Alle leeren Tage füllen" um zu starten.',
     footer: 'Läuft nur auf Personio Monatsansicht',
@@ -152,12 +154,24 @@ function updateScheduleDisplay() {
   schedWork2.textContent = `${be} – ${we}`;
 }
 
-// --- Main autofill ---
+// --- Stop / Busy state ---
+let isFilling = false;
+
 function setBusy(busy) {
-  fillBtn.disabled = busy;
+  isFilling = busy;
   clearBtn.disabled = busy;
   spinner.style.display = busy ? 'inline' : 'none';
-  btnLabel.textContent = busy ? t('fillBtnBusy') : t('fillBtn');
+  if (busy) {
+    fillBtn.style.background = '#e74c3c';
+    fillBtn.style.color = '#fff';
+    btnLabel.textContent = t('stopBtn');
+    fillBtn.title = 'Click to stop';
+  } else {
+    fillBtn.style.background = '';
+    fillBtn.style.color = '';
+    btnLabel.textContent = t('fillBtn');
+    fillBtn.title = '';
+  }
 }
 
 function log(msg, type = 'info') {
@@ -180,6 +194,17 @@ async function sendToContent(action, payload = {}) {
 }
 
 fillBtn.addEventListener('click', async () => {
+  // If currently filling, send stop signal instead
+  if (isFilling) {
+    try {
+      await sendToContent('STOP_AUTOFILL');
+      log('⏹️ Stop signal sent', 'info');
+    } catch (err) {
+      log('Error sending stop: ' + err.message, 'error');
+    }
+    return;
+  }
+
   clearLog();
   log(t('fillLogStart'), 'info');
   setBusy(true);
@@ -194,7 +219,7 @@ fillBtn.addEventListener('click', async () => {
     });
     const result = await sendToContent('AUTOFILL', settings);
     if (result?.ok) {
-      log(result.summary || t('summaryFmt', result.filled || 0), 'ok');
+      log(result.summary || t('summaryFmt', result.filled || 0), result.stopped ? 'info' : 'ok');
       if (result.total > 0) {
         sumFilled.textContent = result.filled || 0;
         sumSkipped.textContent = result.skipped || 0;
@@ -204,7 +229,7 @@ fillBtn.addEventListener('click', async () => {
       if (result.logs) {
         result.logs.forEach(l => {
           if (l.startsWith('✅')) log(l, 'ok');
-          else if (l.startsWith('❌')) log(l, 'error');
+          else if (l.startsWith('❌') || l.startsWith('⏹️')) log(l, 'error');
           else if (l.startsWith('⏭️') || l.startsWith('ℹ️') || l.startsWith('⚠️')) log(l, 'info');
           else log(l, 'info');
         });

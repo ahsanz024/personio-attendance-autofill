@@ -347,12 +347,38 @@
     return true;
   }
 
+  // --- Stop mechanism ---
+  let shouldStop = false;
+
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'STOP_AUTOFILL') {
+      shouldStop = true;
+      sendResponse({ ok: true });
+      return false;
+    }
+    if (message.action === 'PING') {
+      sendResponse({ ok: true, running: isRunning });
+      return false;
+    }
+    if (message.action === 'AUTOFILL') {
+      const settings = {
+        workStart: message.workStart,
+        workEnd: message.workEnd,
+        breakStart: message.breakStart,
+        breakEnd: message.breakEnd
+      };
+      autofill(settings).then(r => sendResponse(r));
+      return true;
+    }
+  });
+
   // --- Main autofill ---
   let isRunning = false;
 
   async function autofill(settings) {
     if (isRunning) return { ok: false, error: 'Already running' };
     isRunning = true;
+    shouldStop = false;
 
     const times = {
       ws: parseTime(settings?.workStart) || { h: 9, m: 0 },
@@ -389,6 +415,11 @@
       for (const day of days) {
         const dn = day.dayNumber;
         const label = (['So','Mo','Di','Mi','Do','Fr','Sa'][day.dayOfWeek] || '??') + ' ' + dn;
+
+        if (shouldStop) {
+          logger.push('⏹️  ' + label + ': stopped by user');
+          break;
+        }
 
         if (day.isWeekend) {
           logger.push('⏭️  ' + label + ': Wochenende');
@@ -438,14 +469,16 @@
 
       const total = days.length;
       const skipped = skippedWeekend + skippedFilled;
-      const summary = filled + '/' + total + ' days filled (' + skipped + ' skipped)';
+      const stopped = shouldStop ? ' ✋ stopped' : '';
+      const summary = filled + '/' + total + ' days filled (' + skipped + ' skipped)' + stopped;
       logger.push('--- ' + summary + ' ---');
 
-      if (filled > 0) showFeedback('✅ ' + summary, 'success');
+      if (shouldStop) showFeedback('✋ Stopped by user', 'error');
+      else if (filled > 0) showFeedback('✅ ' + summary, 'success');
       else if (skipped === total) showFeedback('ℹ️ All days already tracked or weekend', 'success');
       else showFeedback('⚠️ ' + summary, 'error');
 
-      return { ok: true, summary, filled, total, skipped, logs: logger };
+      return { ok: true, summary, filled, total, skipped, stopped: shouldStop, logs: logger };
     } catch (err) {
       showFeedback('❌ Error: ' + err.message, 'error');
       return { ok: false, error: err.message, logs: logger };
@@ -453,19 +486,6 @@
       isRunning = false;
     }
   }
-
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === 'AUTOFILL') {
-      const settings = {
-        workStart: message.workStart,
-        workEnd: message.workEnd,
-        breakStart: message.breakStart,
-        breakEnd: message.breakEnd
-      };
-      autofill(settings).then(r => sendResponse(r));
-      return true;
-    }
-  });
 
   const observer = new MutationObserver(() => {
     if (document.querySelector('[data-test-id="timesheet-timecard"][role="row"]')) {
