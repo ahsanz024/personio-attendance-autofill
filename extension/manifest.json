@@ -4,7 +4,6 @@
   "version": "1.0",
   "description": "Fill Arbeit (09:00-12:00 / 13:00-18:00) and Pause (12:00-13:00) for all working days in Personio monthly view",
   "permissions": ["activeTab", "storage"],
-  "host_permissions": ["*://*.personio.com/*"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -24,9 +23,5 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  },
-  "options_ui": {
-    "page": "popup.html",
-    "open_in_tab": false
   }
 }
